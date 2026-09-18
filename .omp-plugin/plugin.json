@@ -1,0 +1,72 @@
+{
+  "name": "fast-jev-compaction",
+  "version": "0.3.0",
+  "description": "Verbatim Jev-guided compaction for omp sessions.",
+  "license": "MIT",
+  "userConfig": {
+    "provider": {
+      "type": "string",
+      "title": "Jev provider",
+      "description": "Which endpoint answers the Jev questions: 'typesafe' (System One, uses TYPESAFE_API_KEY) or 'openrouter' (decisions endpoint, uses OPENROUTER_API_KEY). Setting OPENROUTER_API_KEY in the environment selects 'openrouter' automatically.",
+      "default": "typesafe"
+    },
+    "apiKey": {
+      "type": "string",
+      "title": "API key",
+      "description": "API key for the selected provider. Leave unset to use TYPESAFE_API_KEY or OPENROUTER_API_KEY from the environment.",
+      "sensitive": true
+    },
+    "keepThreshold": {
+      "type": "number",
+      "title": "Keep threshold",
+      "description": "Minimum Jev probability that a tool call or result is still needed; below it the item is removed.",
+      "default": 0.5
+    },
+    "preserveRecentMessages": {
+      "type": "number",
+      "title": "Recent messages to preserve",
+      "description": "Number of newest messages pinned from compaction.",
+      "default": 6
+    },
+    "minReductionRatio": {
+      "type": "number",
+      "title": "Minimum reduction ratio",
+      "description": "Minimum estimated character reduction required to replace the built-in summary.",
+      "default": 0.25
+    },
+    "maxStateTokens": {
+      "type": "number",
+      "title": "Maximum Jev state tokens",
+      "description": "Estimated token budget for the conversation state sent with every Jev request.",
+      "default": 25000
+    },
+    "maxRequestTokens": {
+      "type": "number",
+      "title": "Maximum Jev request tokens",
+      "description": "Estimated token budget for state plus questions in one Jev request.",
+      "default": 30000
+    },
+    "truncateHeadChars": {
+      "type": "number",
+      "title": "Truncated tool result head",
+      "description": "Characters of a tool result kept when Jev decides its full output is no longer needed; 0 keeps only the note.",
+      "default": 300
+    },
+    "model": {
+      "type": "string",
+      "title": "Jev model",
+      "description": "TypeSafe Jev model name.",
+      "default": "jev-latest"
+    },
+    "baseUrl": {
+      "type": "string",
+      "title": "System One endpoint",
+      "description": "TypeSafe System One endpoint. Defaults to https://api.typesafe.ai/v1/systemone."
+    },
+    "goal": {
+      "type": "string",
+      "title": "Ongoing task description",
+      "description": "Optional task description included in the state sent to Jev. Defaults to the last three user prompts."
+    }
+  }
+}
