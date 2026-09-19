@@ -1,9 +1,9 @@
 # fast-jev-compaction
 
-Claude Code plugin that replaces the compaction summary with Jev decisions:
-every tool call and result is scored in one fast request, stale ones are
-dropped or truncated, everything kept stays verbatim. Also usable as an npm
-library.
+Compaction plugin for Claude Code and omp that replaces the compaction summary
+with Jev decisions: every tool call and result is scored in one fast request,
+stale ones are dropped or truncated, everything kept stays verbatim. Also
+usable as an npm library.
 
 ## What and why
 
@@ -14,9 +14,12 @@ calls and tool results Jev says are no longer needed, and it asks Jev while
 showing it the whole conversation. User and assistant text stays verbatim and
 in order.
 
-The repository is both an npm package (`src/`) and a Claude Code plugin
-(`hooks/`, `.claude-plugin/`) that uses the package to replace Claude Code's
-built-in compaction summary with the original messages.
+The repository is an npm package (`src/`) plus a host adapter per agent, both
+using that package to replace the host's built-in compaction summary with the
+original messages:
+
+- Claude Code (`hooks/`, `.claude-plugin/`) via a function hook
+- omp (`omp/`, `.omp-plugin/`) via an extension on `session_before_compact`
 
 ## How it works
 
@@ -162,11 +165,90 @@ To run from a checkout without installing: `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 
 from the repository root. No publishing step is required; the marketplace is
 just the repo's `.claude-plugin/marketplace.json`.
 
+## omp plugin
+
+The repository is also an [omp](https://github.com/oh-my-pi/omp) extension:
+`omp/hooks.ts` is a thin adapter that maps omp session entries through `src/`
+and returns a verbatim compaction from the `session_before_compact` hook,
+falling back to omp's built-in summarizer on errors or insufficient reduction.
+It shares the library with the Claude Code adapter; only the host glue differs.
+
+### Install in omp
+
+```sh
+omp plugin link /path/to/this/repo    # or: omp plugin install <path>
+omp plugin list                       # ● enabled / ⦸ disabled
+```
+
+Restart the session. Register it in exactly one place — linking it *and*
+listing the directory under `extensions:` in `~/.omp/agent/config.yml` creates a
+second load path that ignores the plugin's enabled flag, so `omp plugin disable`
+reports success while the extension keeps loading.
+
+### Turning it on and off
+
+```sh
+omp plugin disable fast-jev-compaction
+omp plugin enable  fast-jev-compaction
+```
+
+In a session, `/plugins disable fast-jev-compaction` does the same. Extension
+modules load at startup, so a change applies to the next session.
+
+### Configuration
+
+The same options as above, plus the provider selection. omp reads the key from
+the environment, so it never has to live in a file:
+
+| Provider | Endpoint | Model | Env var |
+| --- | --- | --- | --- |
+| `typesafe` (default) | `api.typesafe.ai/v1/systemone` | `jev-latest` | `TYPESAFE_API_KEY` |
+| `openrouter` | `openrouter.ai/api/alpha/decisions` | `typesafe/jev-1.13` | `OPENROUTER_API_KEY` |
+
+Both endpoints speak the `{ model, state, questions }` protocol, so the provider
+is only a base URL, a model name, and which variable holds the key. Setting
+`OPENROUTER_API_KEY` selects OpenRouter automatically.
+
+On OpenRouter the Jev models are **`decisions` models**: they are hidden from
+`GET /api/v1/models` unless `?output_modalities=all` is passed, and
+`chat/completions` rejects them outright. They are reachable only through
+`/api/alpha/decisions` — the endpoint this adapter already speaks.
+
+Options can also be set in `~/.omp/agent/config.yml`:
+
+```yaml
+fastJevCompaction:
+  provider: openrouter
+  preserveRecentMessages: 6
+  keepThreshold: 0.5
+```
+
+### Two omp-specific behaviours
+
+- Registering `session_before_compact` makes omp **skip speculative (async)
+  compaction**, because the extension's answer must be the one committed. This
+  holds even when the adapter declines, so compaction happens inline at the
+  boundary rather than being pre-armed.
+- Returning `{ compaction }` bypasses every method in `compaction.methodOrder`
+  (`remote`, `snapcompact`, `handoff`, `shake`, `soft`).
+
+### Why the mapping is 1:1
+
+omp writes one session entry per tool result. Folding each run of results into
+its assistant message — the obvious optimisation — collapses a transcript to a
+handful of messages, and since the library pins the newest
+`preserveRecentMessages` messages *by index*, a short transcript ends up
+entirely pinned. Nothing is ever a candidate and the adapter silently declines
+every time. `omp/adapter.ts` maps one entry to one `Message`, which is also the
+shape `applyDecisions` expects.
+
+omp names the pairing id `toolCallId`; the library pairs on `tool_use_id`.
+
 ## Development
 
 ```sh
 npm install
-npm run typecheck        # library + hook
+npm run typecheck        # library + Claude Code hook + omp extension
 npm test
 npm run build
 npm run validate:plugin  # claude plugin validate

@@ -20,16 +20,22 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit && npm run typecheck:hooks",
+    "typecheck": "tsc --noEmit && npm run typecheck:hooks && npm run typecheck:omp",
     "test": "vitest run",
     "demo": "tsx examples/demo.ts",
     "typecheck:hooks": "tsc -p tsconfig.hooks.json",
-    "validate:plugin": "claude plugin validate .claude-plugin/plugin.json"
+    "validate:plugin": "claude plugin validate .claude-plugin/plugin.json",
+    "typecheck:omp": "tsc -p tsconfig.omp.json"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "omp": {
+    "extensions": [
+      "./omp/hooks.ts"
+    ]
   }
 }
